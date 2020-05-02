@@ -37,11 +37,15 @@ end_per_suite(Config) ->
   Config.
 
 -spec all() -> [atom()].
+-ifdef(CURRENT_DEPS).
 all() -> [F || {F, _A} <- module_info(exports),
                case atom_to_list(F) of
                  "t_" ++ _ -> true;
                  _         -> false
                end].
+-else.
+all() -> [].
+-endif.
 
 -spec suite() -> [atom()].
 suite() -> [{timetrap, {minutes, 5}}].

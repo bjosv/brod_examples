@@ -1,14 +1,47 @@
-.PHONY: all test-env test clean
+.PHONY: all test test-env profile clean
 
-all:
-	@rebar3 compile
+all: profile
+	@echo Available profiles: [old, current, latest]
+	@echo
+	@echo Set using: export PROFILE=xxxx
+
+test: clean profile
+	@rebar3 as ${PROFILE} compile
+	@rebar3 as ${PROFILE} tree
+	@rebar3 as ${PROFILE} ct -v
 
 test-env:
 	@scripts/setup-test-env.sh
 
-test:
-	@rebar3 ct -v
+profile:
+	@echo ============================================
+	@echo Current profile: ${PROFILE}
+	@echo ============================================
 
 clean:
 	@rebar3 clean
-	@rm -rf _build
+	@rm -rf _build rebar.lock
+
+# old
+# │
+# └─ brod─3.7.5 (hex package)
+#    ├─ kafka_protocol─2.2.7 (hex package)
+#    │  ├─ crc32cer─0.1.3 (hex package)
+#    │  └─ snappyer─1.2.4 (hex package)
+#    └─ supervisor3─1.1.8 (hex package)
+
+# current
+# │
+# └─ brod─3.9.5 (hex package)
+#    ├─ kafka_protocol─2.3.3 (hex package)
+#    │  ├─ crc32cer─0.1.3 (hex package)
+#    │  └─ snappyer─1.2.4 (hex package)
+#    └─ supervisor3─1.1.8 (hex package)
+
+# latest
+# │
+# ├─ brod─3.9.5 (hex package)
+# │  └─ supervisor3─1.1.8 (hex package)
+# └─ kafka_protocol─2.4.0 (git repo)
+#    ├─ crc32cer─0.1.4 (hex package)
+#    └─ snappyer─1.2.5 (hex package)
