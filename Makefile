@@ -1,14 +1,17 @@
 .PHONY: all test test-env profile clean
 
-all: profile
+all: clean profile
 	@echo Available profiles: [old, current, latest]
 	@echo
 	@echo Set using: export PROFILE=xxxx
-
-test: clean profile
 	@rebar3 as ${PROFILE} compile
 	@rebar3 as ${PROFILE} tree
+
+test: tree
 	@rebar3 as ${PROFILE} ct -v
+
+tree:
+	@rebar3 as ${PROFILE} tree
 
 test-env:
 	@scripts/setup-test-env.sh

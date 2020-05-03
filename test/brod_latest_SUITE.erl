@@ -1,4 +1,4 @@
--module(brod_SUITE).
+-module(brod_latest_SUITE).
 
 -export([ init_per_suite/1
         , end_per_suite/1
@@ -21,8 +21,8 @@
 -define(HOSTS, [{"localhost", 9092}]).
 -define(TIMEOUT, 280000).
 
+-define(TOPIC, <<"test-topic">>).
 -define(RESOURCE_TYPE_TOPIC, 2).
--define(TOPIC, <<"test-topic1">>).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Common test
@@ -37,13 +37,12 @@ end_per_suite(Config) ->
   Config.
 
 -spec all() -> [atom()].
--ifdef(CURRENT_DEPS).
-all() -> [ t_create_topics
-         , t_describe_configs_before_alter
-         , t_alter_configs
-         , t_describe_configs_after_alter
-         , t_delete_topics
-         ].
+-ifdef(LATEST_DEPS).
+all() -> [F || {F, _A} <- module_info(exports),
+               case atom_to_list(F) of
+                 "t_" ++ _ -> true;
+                 _         -> false
+               end].
 -else.
 all() -> [].
 -endif.
@@ -57,13 +56,14 @@ suite() -> [{timetrap, {minutes, 5}}].
 
 t_create_topics(Config) when is_list(Config) ->
   TopicConfig = [
-                 #{ config_entries => [
-                                       [ {config_name, "cleanup.policy"}
-                                       , {config_value, <<"compact">>}]
-                                      ]
-                  , num_partitions => 2
+                 #{
+                   config_entries => [
+                                      [ {config_name, "cleanup.policy"}
+                                      , {config_value, <<"compact">>}]
+                                     ]
+                  , num_partitions => 1
                   , replica_assignment => []
-                  , replication_factor => 2
+                  , replication_factor => 1
                   , topic => ?TOPIC
                   }
                 ],
@@ -72,23 +72,17 @@ t_create_topics(Config) when is_list(Config) ->
                                   #{connect_timeout => ?TIMEOUT})).
 
 
-t_delete_topics(Config) when is_list(Config) ->
-  ?assertEqual(ok, brod:delete_topics(?HOSTS, [?TOPIC], ?TIMEOUT,
-                                      #{connect_timeout => ?TIMEOUT})).
-
-
 t_describe_configs_before_alter(Config) when is_list(Config) ->
   DescribeConfigsArgs =
     #{ resource_type => ?RESOURCE_TYPE_TOPIC
      , resource_name => ?TOPIC
      , config_names => ["cleanup.policy"]
      },
-  Vsn = 0, % max api version
-  Body = #{ resources => [DescribeConfigsArgs]
-          },
+  Vsn = 0, % API version used
+  Opts = #{include_synonyms => false},
   {ok, Rsp} = with_conn(kpro:connect_controller(?HOSTS, #{connect_timeout => ?TIMEOUT}),
                         fun(Pid) ->
-                            Req = kpro_req_lib:make(describe_configs, Vsn, Body),
+                            Req = kpro_req_lib:describe_configs(Vsn, [DescribeConfigsArgs], Opts),
                             brod_utils:request_sync(Pid, Req)
                         end),
   [Resource] = kpro:find(resources, Rsp),
@@ -106,14 +100,12 @@ t_alter_configs(Config) when is_list(Config) ->
                           , {config_value, <<"delete">>}]
                          ]
      },
-  Vsn = 0, % max api version
-  Body = #{ resources => [AlterConfigsArgs]
-          , validate_only => false
-          },
+  Vsn = 0, % API version used
+  Opts = #{validate_only => false},
   with_conn(kpro:connect_controller(?HOSTS, #{connect_timeout => ?TIMEOUT}),
             fun(Pid) ->
-                Request = kpro_req_lib:make(alter_configs, Vsn, Body),
-                brod_utils:request_sync(Pid, Request)
+                Req = kpro_req_lib:alter_configs(Vsn, [AlterConfigsArgs], Opts),
+                brod_utils:request_sync(Pid, Req)
             end).
 
 
@@ -123,18 +115,22 @@ t_describe_configs_after_alter(Config) when is_list(Config) ->
      , resource_name => ?TOPIC
      , config_names => ["cleanup.policy"]
      },
-  Vsn = 0, % max api version
-  Body = #{ resources => [DescribeConfigsArgs]
-          },
+  Vsn = 0, % API version used
+  Opts = #{include_synonyms => false},
   {ok, Rsp} = with_conn(kpro:connect_controller(?HOSTS, #{connect_timeout => ?TIMEOUT}),
                         fun(Pid) ->
-                            Req = kpro_req_lib:make(describe_configs, Vsn, Body),
+                            Req = kpro_req_lib:describe_configs(Vsn, [DescribeConfigsArgs], Opts),
                             brod_utils:request_sync(Pid, Req)
                         end),
   [Resource] = kpro:find(resources, Rsp),
   [Entry] = kpro:find(config_entries, Resource),
   ConfigValue = kpro:find(config_value, Entry),
   ?assertEqual(<<"delete">>, ConfigValue).
+
+
+t_delete_topics(Config) when is_list(Config) ->
+  ?assertEqual(ok, brod:delete_topics(?HOSTS, [?TOPIC], ?TIMEOUT,
+                                      #{connect_timeout => ?TIMEOUT})).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helpers
