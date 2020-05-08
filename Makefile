@@ -2,8 +2,9 @@
 
 all: clean profile
 	@echo Available profiles: [old, current, latest]
+	@echo Set a profile using:
+	@echo export PROFILE=xxxx
 	@echo
-	@echo Set using: export PROFILE=xxxx
 	@rebar3 as ${PROFILE} compile
 	@rebar3 as ${PROFILE} tree
 
@@ -12,6 +13,9 @@ test: tree
 
 tree:
 	@rebar3 as ${PROFILE} tree
+
+dialyzer:
+	@rebar3 as ${PROFILE} dialyzer
 
 test-env:
 	@scripts/setup-test-env.sh
